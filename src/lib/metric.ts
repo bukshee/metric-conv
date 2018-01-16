@@ -1,119 +1,122 @@
 'use strict'
 
-// holds a map of unit => convFn(val)
-var unitMap = new Map();
-// aliases for units (ft to foot, bsh to bushel etc)
-var unitAlias = new Map();
+type UnitFormula = (val: number) => number
+type UnitMap = [string, string, number|UnitFormula]
+type ValUnitPair = [number, string]
 
-// distance
-unitMap.set('foot', (val:number) => { return [0.3048*val, 'm'] })
-unitAlias.set('ft','foot')
-unitAlias.set('feet','foot')
-unitMap.set('inch', (val:number) => { return [0.0254*val, 'm'] })
-unitAlias.set('in','inch')
-unitMap.set('yard', (val:number) => { return [0.9144*val, 'm'] })
-unitAlias.set('yd','yard')
-unitMap.set('mile', (val:number) => { return [1609.344*val, 'm'] })
-unitAlias.set('mi','mile')
+const mapper:UnitMap[] = [
 
-// mass
-unitMap.set('ton', (val:number) => { return [907184.7*val, 'g'] })
-unitAlias.set('tn','ton')
-unitMap.set('pound', (val:number) => { return [453.5924*val, 'g'] })
-unitAlias.set('lb','pound')
-unitMap.set('ounce', (val:number) => { return [28.349526*val, 'g'] })
-unitAlias.set('oz','ounce')
-unitMap.set('carat', (val:number) => { return [0.2*val, 'g'] })
-unitAlias.set('ct','carat')
+    // distance
+    ['foot|ft|feet' , 'm', 0.3048],
+    ['inch|in'      , 'm', 0.0254],
+    ['yard|yd'      , 'm', 0.9144],
+    ['mile|mi'      , 'm', 1609.344],
 
-// volume
-unitMap.set('gallon (UK)', (val:number) => { return [4.546090*val, 'liter'] })
-unitMap.set('gallon', (val:number) => { return [3.7854118*val, 'liter'] })
-unitAlias.set('gal','gallon')
-unitMap.set('pint', (val:number) => { return [0.473176475*val, 'liter'] })
-unitAlias.set('pt','pint')
-unitMap.set('bushel (UK)', (val:number) => { return [36.36872*val, 'liter'] })
-unitMap.set('bushel', (val:number) => { return [35.239072*val, 'liter'] })
-unitAlias.set('bsh','bushel')
-unitAlias.set('bu','bushel')
-unitMap.set('teaspoon', (val:number) => { return [35.239072*val, 'liter'] })
-unitAlias.set('tsp','teaspoon')
-unitMap.set('cu-in', (val:number) => { return [0.016387064*val, 'liter'] })
-unitAlias.set('cu in','cu-in')
-unitMap.set('fl oz', (val:number) => { return [0.029573529*val, 'liter'] })
+    // mass
+    ['ton|tn'       , 'g', 907184.7],
+    ['pound|lb'     , 'g', 453.5924],
+    ['ounce|oz'     , 'g', 28.349526],
+    ['carat|ct'     , 'g', 0.2],
 
-// area
-unitMap.set('acre', (val:number) => { return [4046.85642*val, 'm2'] })
-unitMap.set('sq-mi', (val:number) => { return [2589988*val, 'm2'] })
-unitAlias.set('sq mi','sq-mi')
-unitMap.set('ha', (val:number) => { return [10000*val, 'm2'] })
-unitMap.set('fahrenheit', (val:number) => { return [(val-32)*5/9, 'C'] })
-unitAlias.set('f','fahrenheit')
-unitAlias.set('degf','fahrenheit')
+    // volume
+    ['gallon (UK)'  , 'l', 4.546090],
+    ['gallon|gal'   , 'l', 3.7854118],
+    ['pint|pt'      , 'l', 0.473176475],
+    ['bushel (UK)'  , 'l', 36.36872],
+    ['bushel|bsh|bu', 'l', 35.239072],
+    ['teaspoon|tsp' , 'l', 35.239072],
+    ['cu-in|cu in'  , 'l', 0.016387064],
+    ['fl-oz|fl oz'  , 'l', 0.029573529],
 
-// speed
-unitMap.set('knot', (val:number) => { return [0.5144447*val, 'm/s'] })
-unitAlias.set('kt','knot')
-unitAlias.set('kn','knot')
-unitMap.set('km/h', (val:number) => { return [val/3.6, 'm/s'] })
-unitAlias.set('kph','km/h')
-unitAlias.set('kmph','km/h')
-unitMap.set('mph', (val:number) => { return [val/0.44704, 'm/s'] })
-unitMap.set('mpg', (val:number) => { return [val*3.7854/1.609344, 'km per liter'] })
+    // area
+    ['acre'         , 'm2', 4046.85642],
+    ['sq-mi|sq mi|square mile', 'm2', 2589988],
+    ['ha'           , 'm2', 10000],
 
-// power, torque
-unitMap.set('hp', (val:number) => { return [735.49875*val, 'W'] })
-unitMap.set('bhp', (val:number) => { return [745.699872*val, 'W'] })
-unitMap.set('lb-ft', (val:number) => { return [1.3558179483314*val, 'Nm'] })
-unitAlias.set('pound foot','lb-ft')
-unitAlias.set('pound feet','lb-ft')
+    // speed
+    ['knot|kt|kn'   , 'm/s', 0.5144447],
+    ['km/h|kph|kmph', 'm/s', 0.27777777],
+    ['mph'          , 'm/s', 2.23693629205],
+    
+    // power, torque
+    ['hp'           , 'W',  735.49875],
+    ['bhp'          , 'W', 745.699872],
+
+    // misc
+    ['lb-ft|pound feet| pound foot', 'Nm', 1.3558179483314],
+    ['fahrenheit|f|degf', 'C', (val:number) => { return (val-32)*5/9 }],
+    ['mpg', 'km per liter', 2.35213851109]
+
+]
+
+
+
+
+
+
 
 /**
  * Returns an array of the supported input units
+ * @param {string=} output unit to filter by (optional)
  * @returns {string[]} List of input units supported
  */
-export function inputUnits(): string[] {
-    let ret: string[]=[]
-    for(const unit of unitMap.keys())
-        ret.push(unit)
+export function supportedUnits(filter?: string): string[] {
+    let ret = []
+    for(const map of mapper) {
+        const [un,si,f] = map
+        if (filter && filter !== si)
+            continue
+        let u = un || ''
+        u = u.replace(/\|.*/,'')
+        ret.push(u)
+    }
     return ret
 }
 
-export type Converted = [number, string]
-export type ConverterFun = (val:number) => Converted
-
-
 /**
- * Returns the converter function for the inputUnit if the unit is supported. Returns undef if not.
- * The function returned takes a single argument: the value to convert. Unit aliases and plurals are
- * resolved, too. So e.g. 'ft' and 'feet' resolved to 'foot' or 'mi' and 'miles' to 'mile'.
+ * Converts input value-unit pair to metric value-unit pair if unit is supported. Returns null if not.
+ * Unit aliases and plurals are resolved, too. So e.g. 'ft' and 'feet' resolved to 'foot' or
+ * 'mi' and 'miles' to 'mile'.
  * 
- * @param {string} inputUnit The unit to convert from
- * @returns {ConverterFun | undefined} the converter function or undefined
+ * @param {ValUnitPair} input: The value-unit pair to convert from
+ * @returns {ValUnitPair | null} [SIUnit, converted value] or null
+ * @throws
  */
-export function unitToConverter(inputUnit:string): ConverterFun|undefined {
-    if (typeof inputUnit !== typeof '')
+export function convert(input: ValUnitPair):ValUnitPair|null {
+    let [val, unit] = input
+    if (typeof unit !== typeof '' || !Number.isFinite(val))
         throw "Wrong argument"
-    else if (inputUnit.length === 0)
-        return undefined
+    else if (unit.length === 0)
+        return null
+
+    unit = unit.toLowerCase()
     
-    let s: string = inputUnit.toLowerCase()
-    if (unitMap.has(s))
-        return unitMap.get(s)
-    else if (unitAlias.has(s))
-        return unitMap.get(unitAlias.get(s))
-    else if (s.endsWith('s'))
-        return unitToConverter(s.slice(0,-1))
-    else
-        return undefined
+    for (const map of mapper) {
+        const [un,si,f] = map
+        let re = new RegExp('^(' + un + ')$')
+        console.log(re)
+        if (!re.test(unit)) continue
+        let newVal
+        if (typeof f === 'number')
+            newVal = val*f
+        else if (typeof f === 'function')
+            newVal = f(val)
+        else
+            throw `Unexpedted value: ${f}`
+        return [newVal, si]
+    }
+    if (unit.endsWith('s'))
+        return convert([val, unit.slice(0,-1)])
+    
+    return null
 }
 
 /**
- * Formats converted value in a user-friendly manner, changing dimensions as necessary
+ * Formats converted value-unit pair in a user-friendly manner, changing dimensions as necessary
  * @param arr Converted value in [value, SI-unit] format
  * @returns {string} Formatted value with unit at the end ( e.g. '1.2 cm')
  */
-export function converterToString(arr: Converted): string {
+export function toHumanReadable(arr: ValUnitPair): string {
     if (!arr || !Array.isArray(arr)) return ''
     
     let [val,format] = arr
@@ -127,12 +130,14 @@ export function converterToString(arr: Converted): string {
         else if (val>1000)
             return (val/1000).toFixed(3) + ' k' + format
         else if (val<0.1)
-            return (val/1000).toFixed(3) + ' m' + format
+            return (val*1000).toFixed(3) + ' m' + format
     } else if ('g' === format) {
         if (val>1e6)
             return (val/1e6).toFixed(3) + ' tonne'
         else if (val>1000)
             return (val/1000).toFixed(3) + ' kg'
+        else if (val>0.1)
+            return (val*1000).toFixed(3) + ' mg'
     } else if ('m2' === format) {
         if(val>1e6)
             return (val/1e6).toFixed(3) + ' k' + format
@@ -145,7 +150,7 @@ export function converterToString(arr: Converted): string {
     return val.toFixed(3) + ' ' + format
 }
 
-console.log(inputUnits())
+//console.log(inputUnits('l'))
 /*const converter = unitToConverter('pound')
 if (converter)
     console.log(converterToString(converter((3.04))))*/
