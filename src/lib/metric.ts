@@ -25,11 +25,14 @@ const mapper:UnitMap[] = [
     ['bushel (UK)'  , 'l', 36.36872],
     ['bushel|bsh|bu', 'l', 35.239072],
     ['teaspoon|tsp' , 'l', 35.239072],
-    ['cu-in|cu in'  , 'l', 0.016387064],
+    ['cu-in|cu in|cuin'  , 'l', 0.016387064],
+    ['cu-ft|cu ft|cuft'  , 'l', 28.31685],
     ['fl-oz|fl oz'  , 'l', 0.029573529],
 
     // area
     ['acre'         , 'm2', 4046.85642],
+    ['sq-in|sqin|sq in', 'm2', 0.00064516],
+    ['sq-ft|sqft|sq ft', 'm2', 0.09290304],
     ['sq-mi|sq mi|square mile', 'm2', 2589988],
     ['ha'           , 'm2', 10000],
 
@@ -44,7 +47,8 @@ const mapper:UnitMap[] = [
 
     // misc
     ['lb-ft|pound feet| pound foot', 'Nm', 1.3558179483314],
-    ['fahrenheit|f|degf', 'C', (val:number) => { return (val-32)*5/9 }],
+    ['°F|fahrenheit|f|degf', '°C', (val:number) => { return (val-32)*5/9 }],
+    ['K|kelvin|degk','°C', (val:number) => { return val-272.15 }],
     ['mpg', 'km per liter', 2.35213851109]
 
 ]
@@ -94,7 +98,6 @@ export function convert(input: ValUnitPair):ValUnitPair|null {
     for (const map of mapper) {
         const [un,si,f] = map
         let re = new RegExp('^(' + un + ')$')
-        console.log(re)
         if (!re.test(unit)) continue
         let newVal
         if (typeof f === 'number')
@@ -122,35 +125,104 @@ export function toHumanReadable(arr: ValUnitPair): string {
     let [val,format] = arr
     if (!val || !Number.isFinite(val)) return ''
 
+    // trim 
+    const numF = (val:number) => {
+        // trim ending zeros: 5.000 => 5 ; 5.120 => 5.12
+        return val.toFixed(3).replace(/\.?0+$/,'')
+    }
+
     if ('m,W,m/s'.split(',').indexOf(format)>=0) {
         if (val>1e9)
-            return (val/1e9).toFixed(3) + ' G' + format
+            return numF(val/1e9) + ' G' + format
         else if (val>1e6)
-            return (val/1e6).toFixed(3) + ' M' + format
+            return numF(val/1e6) + ' M' + format
         else if (val>1000)
-            return (val/1000).toFixed(3) + ' k' + format
+            return numF(val/1000) + ' k' + format
         else if (val<0.1)
-            return (val*1000).toFixed(3) + ' m' + format
+            return numF(val*1000) + ' m' + format
     } else if ('g' === format) {
         if (val>1e6)
-            return (val/1e6).toFixed(3) + ' tonne'
+            return numF(val/1e6) + ' tonne'
         else if (val>1000)
-            return (val/1000).toFixed(3) + ' kg'
+            return numF(val/1000) + ' kg'
         else if (val>0.1)
-            return (val*1000).toFixed(3) + ' mg'
+            return numF(val*1000) + ' mg'
     } else if ('m2' === format) {
-        if(val>1e6)
-            return (val/1e6).toFixed(3) + ' k' + format
-    } else if ('liter' === format) {
+        if (val>1e6)
+            return numF(val/1e6) + ' k' + format
+        else if (val<0.01)
+            return numF(val*1e4) + ' cm2'
+    } else if ('l' === format) {
         if (val>1000)
-            return (val/1000).toFixed(3) + ' m3'
-        else if (val<100)
-            return (val*1000).toFixed(3) + ' cm3'
+            return numF(val/1000) + ' m3'
+        else if (val<0.01)
+            return numF(val*1000) + ' cm3'
+        else
+            return numF(val) + ' liter'
     }
-    return val.toFixed(3) + ' ' + format
+    return numF(val) + ' ' + format
 }
 
-//console.log(inputUnits('l'))
-/*const converter = unitToConverter('pound')
-if (converter)
-    console.log(converterToString(converter((3.04))))*/
+type Parsed = {
+    valueIn?: number,
+    valueOut?: number,
+    unitIn?: string,
+    unitOut?: string,
+    humanOut?: string
+}
+
+/**
+ * Parses a given string for number(s) and units to convert from
+ * @param str:string The input string to parse
+ * @returns a Parsed object filled with the result
+ */
+export function parseStr(str: string): Parsed {
+    if (typeof str !== 'string' || !str.length)
+        return {}
+    
+    str = str.trim().toLowerCase()
+    let m
+    
+    // '6ft 1in' format?
+    m = str.match(/(.+?)\s*(ft|foot|feet|')\s+(.+?)\s*(in|inch|")/)
+    if (m && !Number.isNaN(Number.parseFloat(m[1])) && !Number.isNaN(Number.parseFloat(m[3]))) {
+        const foot = convert([Number.parseFloat(m[1]),'foot'])
+        const inch = convert([Number.parseFloat(m[3]),'inch'])
+        if(foot && inch) {
+            return {
+                valueIn: Number.parseFloat(m[1]),
+                unitIn: 'foot',
+                valueOut: foot[0],
+                unitOut: foot[1],
+                humanOut: toHumanReadable([foot[0]+inch[0],foot[1]])
+            }
+        }
+    }
+    
+    // '5 degF' format?
+    m = str.match(/([0-9e\,\.-]+)\s*(.+)$/)
+    if (m && !Number.isNaN(Number.parseFloat(m[1]))) {
+        const vin = Number.parseFloat(m[1])
+        const v = convert([vin,m[2]])
+        console.log(v)
+        if (v) {
+            return {
+                valueIn: vin, unitIn: m[2],
+                valueOut: v[0], unitOut: v[1],
+                humanOut: toHumanReadable(v)
+            }
+        }
+    }
+
+    // maybe just the unit?
+    const v = convert([1,str])
+    if (v) {
+        return {
+            valueIn: 1, unitIn: str,
+            valueOut: v[0], unitOut: v[1],
+            humanOut: toHumanReadable(v) }
+    }
+    
+    // giving up
+    return {}
+}
