@@ -11,6 +11,11 @@ const mapper:UnitMap[] = [
     ['inch|in'      , 'm', 0.0254],
     ['yard|yd'      , 'm', 0.9144],
     ['mile|mi'      , 'm', 1609.344],
+    ['nautical mile|naut-mile|nmi', 'm', 1852],
+    ['furlong', 'm', 201.2],
+    ['rod|rd', 'm', 5.029],
+    ['fathom', 'm', 1.829],
+    ['pica', 'm', 0.0042175176],
 
     // mass
     ['ton|tn'       , 'g', 907184.7],
@@ -28,28 +33,47 @@ const mapper:UnitMap[] = [
     ['cu-in|cu in|cuin'  , 'l', 0.016387064],
     ['cu-ft|cu ft|cuft'  , 'l', 28.31685],
     ['fl-oz|fl oz'  , 'l', 0.029573529],
+    ['quart|qt', 'l', 0.946353],
+    ['quart (UK)', 'l', 1.13652],
 
     // area
     ['acre'         , 'm2', 4046.85642],
     ['sq-in|sqin|sq in', 'm2', 0.00064516],
     ['sq-ft|sqft|sq ft', 'm2', 0.09290304],
     ['sq-mi|sq mi|square mile', 'm2', 2589988],
-    ['ha'           , 'm2', 10000],
+    ['ha|hectare'           , 'm2', 10000],
 
     // speed
     ['knot|kt|kn'   , 'm/s', 0.5144447],
     ['km/h|kph|kmph', 'm/s', 0.27777777],
     ['mph'          , 'm/s', 2.23693629205],
     
-    // power, torque
+    // power, energy, torque
     ['hp'           , 'W',  735.49875],
     ['bhp'          , 'W', 745.699872],
+    ['btu', 'J', 1055.056],
+    ['kcal|kilocalorie|Cal', 'J', 4184],
+    ['calorie|cal', 'J', 4.184],
+    ['kWh|kilowatt hour', 'J', 3600000],
+    ['Wh|watt hour', 'J', 3600],
+
+    // pressure
+    ['bar', 'Pa', 1e5],
+    ['mmHg', 'Pa', 133.322],
+    ['inHg', 'Pa', 3386.389],
+    ['torr', 'Pa', 133.3224],
+    ['atm|atmosphere', 'Pa', 101325],
+    ['psi', 'Pa', 6894.757],
 
     // misc
     ['lb-ft|pound feet| pound foot', 'Nm', 1.3558179483314],
     ['°F|fahrenheit|f|degf', '°C', (val:number) => { return (val-32)*5/9 }],
     ['K|kelvin|degk','°C', (val:number) => { return val-272.15 }],
-    ['mpg', 'km per liter', 2.35213851109]
+    ['rankine|degR', '°C', (val:number) => { return (val-491.67)*5/9 }],
+    ['mpg', 'km per liter', 2.35213851109],
+    ['rpm', 'Hz', 1 / 60.0],
+    ['degree|deg', 'radian', 2*Math.PI/360],
+    ['gradian|grad|gon', 'radian', Math.PI/200]
 
 ]
 
@@ -97,7 +121,7 @@ export function convert(input: ValUnitPair):ValUnitPair|null {
     
     for (const map of mapper) {
         const [un,si,f] = map
-        let re = new RegExp('^(' + un + ')$')
+        let re = new RegExp('^(' + un + ')$','i')
         if (!re.test(unit)) continue
         let newVal
         if (typeof f === 'number')
@@ -131,7 +155,7 @@ export function toHumanReadable(arr: ValUnitPair): string {
         return val.toFixed(3).replace(/\.?0+$/,'')
     }
 
-    if ('m,W,m/s'.split(',').indexOf(format)>=0) {
+    if ('m,W,m/s,J,W,Pa'.split(',').indexOf(format)>=0) {
         if (val>1e9)
             return numF(val/1e9) + ' G' + format
         else if (val>1e6)
