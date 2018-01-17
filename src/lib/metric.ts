@@ -89,6 +89,8 @@ const mapper:UnitMap[] = [
  * @returns {string[]} List of input units supported
  */
 export function supportedUnits(filter?: string): string[] {
+    if (filter && typeof filter !== typeof '')
+        throw "Contract violation"
     let ret = []
     for(const map of mapper) {
         const [un,si,f] = map
@@ -111,6 +113,8 @@ export function supportedUnits(filter?: string): string[] {
  * @throws
  */
 export function convert(input: ValUnitPair):ValUnitPair|null {
+    if (typeof input !== typeof [] || input.length!=2)
+        throw "Contract violation"
     let [val, unit] = input
     if (typeof unit !== typeof '' || !Number.isFinite(val))
         throw "Wrong argument"
@@ -120,8 +124,10 @@ export function convert(input: ValUnitPair):ValUnitPair|null {
     unit = unit.toLowerCase()
     
     for (const map of mapper) {
+        if (typeof map !== typeof [] || map.length!=3)
+            throw "Contract violation"
         const [un,si,f] = map
-        let re = new RegExp('^(' + un + ')$','i')
+        const re = new RegExp('^(' + un + ')$','i')
         if (!re.test(unit)) continue
         let newVal
         if (typeof f === 'number')
@@ -144,9 +150,10 @@ export function convert(input: ValUnitPair):ValUnitPair|null {
  * @returns {string} Formatted value with unit at the end ( e.g. '1.2 cm')
  */
 export function toHumanReadable(arr: ValUnitPair): string {
-    if (!arr || !Array.isArray(arr)) return ''
+    if (typeof arr !== typeof [] || arr.length!=2)
+        throw "Contract violation"
     
-    let [val,format] = arr
+    const [val,format] = arr
     if (!val || !Number.isFinite(val)) return ''
 
     // trim 
@@ -201,7 +208,9 @@ type Parsed = {
  * @returns a Parsed object filled with the result
  */
 export function parseStr(str: string): Parsed {
-    if (typeof str !== 'string' || !str.length)
+    if (typeof str !== 'string')
+        throw "Contract violation"
+    if (!str.length)
         return {}
     
     str = str.trim().toLowerCase()
@@ -214,10 +223,8 @@ export function parseStr(str: string): Parsed {
         const inch = convert([Number.parseFloat(m[3]),'inch'])
         if(foot && inch) {
             return {
-                valueIn: Number.parseFloat(m[1]),
-                unitIn: 'foot',
-                valueOut: foot[0],
-                unitOut: foot[1],
+                valueIn: Number.parseFloat(m[1]), unitIn: 'foot',
+                valueOut: foot[0], unitOut: foot[1],
                 humanOut: toHumanReadable([foot[0]+inch[0],foot[1]])
             }
         }
