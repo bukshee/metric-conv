@@ -7,8 +7,8 @@ type ValUnitPair = [number, string]
 const mapper:UnitMap[] = [
 
     // distance
-    ['foot|ft|feet' , 'm', 0.3048],
-    ['inch|in'      , 'm', 0.0254],
+    ['foot|ft|feet|\'' , 'm', 0.3048],
+    ['inch|in|"'      , 'm', 0.0254],
     ['yard|yd'      , 'm', 0.9144],
     ['mile|mi'      , 'm', 1609.344],
     ['nautical mile|naut-mile|nmi', 'm', 1852],
@@ -16,6 +16,8 @@ const mapper:UnitMap[] = [
     ['rod|rd', 'm', 5.029],
     ['fathom', 'm', 1.829],
     ['pica', 'm', 0.0042175176],
+    ['ly|light year', 'm', 9.4607*1e15],
+    ['pc|parsec', 'm', 3.0857*1e16],
 
     // mass
     ['ton|tn'       , 'g', 907184.7],
@@ -35,6 +37,8 @@ const mapper:UnitMap[] = [
     ['fl-oz|fl oz'  , 'l', 0.029573529],
     ['quart|qt', 'l', 0.946353],
     ['quart (UK)', 'l', 1.13652],
+    ['barrel', 'l', 158.99],
+    ['bpd', 'l/s',158.99/(24*60*60)],
 
     // area
     ['acre'         , 'm2', 4046.85642],
@@ -46,11 +50,11 @@ const mapper:UnitMap[] = [
     // speed
     ['knot|kt|kn'   , 'm/s', 0.5144447],
     ['km/h|kph|kmph', 'm/s', 0.27777777],
-    ['mph'          , 'm/s', 2.23693629205],
+    ['mph'          , 'm/s', 1.609344],
     
     // power, energy, torque
-    ['hp'           , 'W',  735.49875],
-    ['bhp'          , 'W', 745.699872],
+    ['ps'           , 'W',  735.49875],
+    ['hp|bhp|horsepower' , 'W', 745.699872],
     ['btu', 'J', 1055.056],
     ['kcal|kilocalorie|Cal', 'J', 4184],
     ['calorie|cal', 'J', 4.184],
@@ -66,11 +70,11 @@ const mapper:UnitMap[] = [
     ['psi', 'Pa', 6894.757],
 
     // misc
-    ['lb-ft|pound feet| pound foot', 'Nm', 1.3558179483314],
+    ['lb-ft|lb. ft.|lb ft|pound feet|pound foot', 'Nm', 1.3558179483314],
     ['°F|fahrenheit|f|degf', '°C', (val:number) => { return (val-32)*5/9 }],
     ['K|kelvin|degk','°C', (val:number) => { return val-272.15 }],
     ['rankine|degR', '°C', (val:number) => { return (val-491.67)*5/9 }],
-    ['mpg', 'km per liter', 2.35213851109],
+    ['mpg', 'km per liter', 1.609344/3.7854118],
     ['rpm', 'Hz', 1 / 60.0],
     ['degree|deg', 'radian', 2*Math.PI/360],
     ['gradian|grad|gon', 'radian', Math.PI/200]
@@ -154,15 +158,29 @@ export function toHumanReadable(arr: ValUnitPair): string {
         throw "Contract violation"
     
     const [val,format] = arr
-    if (!val || !Number.isFinite(val)) return ''
+    if (!Number.isFinite(val)) return ''
 
-    // trim 
+    // format numbers for human consumption
     const numF = (val:number) => {
-        // trim ending zeros: 5.000 => 5 ; 5.120 => 5.12
-        return val.toFixed(3).replace(/\.?0+$/,'')
+        
+        // scientific notation
+        if (val>1e9)
+            return val.toExponential(4)
+
+        let ret = val.toFixed(3)
+            .replace(/\.?0+$/,'') // trim ending zeros: 5.000 => 5 ; 5.120 => 5.12
+        
+        // add thousands separator: 12345 => 12 345
+        while(1) {
+            const after = ret.replace(/(\d)(\d\d\d)( |$|\.)/g,'$1 $2$3')
+            if (after === ret) break
+            ret = after
+        }
+
+        return ret       
     }
 
-    if ('m,W,m/s,J,W,Pa'.split(',').indexOf(format)>=0) {
+    if ('W,J,W,Pa'.split(',').indexOf(format)>=0) {
         if (val>1e9)
             return numF(val/1e9) + ' G' + format
         else if (val>1e6)
@@ -171,6 +189,9 @@ export function toHumanReadable(arr: ValUnitPair): string {
             return numF(val/1000) + ' k' + format
         else if (val<0.1)
             return numF(val*1000) + ' m' + format
+    } else if('m' === format || 'm/s' === format) {
+        if (val>1000)
+            return numF(val/1000) + ' k' + format
     } else if ('g' === format) {
         if (val>1e6)
             return numF(val/1e6) + ' tonne'
@@ -184,12 +205,21 @@ export function toHumanReadable(arr: ValUnitPair): string {
         else if (val<0.01)
             return numF(val*1e4) + ' cm2'
     } else if ('l' === format) {
-        if (val>1000)
+        if (val>1e12)
+            return numF(val/1e12) + ' km3'
+        else if (val>1000)
             return numF(val/1000) + ' m3'
         else if (val<0.01)
             return numF(val*1000) + ' cm3'
         else
             return numF(val) + ' liter'
+    } else if ('l/s' === format) {
+        if (val>1e12)
+            return numF(val/1e12) + ' km3/s'
+        else if (val>1000)
+            return numF(val/1000) + ' m3/s'
+        else if (val<0.01)
+            return numF(val*1000) + ' cm3/s'
     }
     return numF(val) + ' ' + format
 }
@@ -216,6 +246,23 @@ export function parseStr(str: string): Parsed {
     str = str.trim().toLowerCase()
     let m
     
+    // X million bpd
+    m = str.match(/(.+?)\s*(billion|million|thousand)\s+(.+)/)
+    if (m && !Number.isNaN(Number.parseFloat(m[1]))) {
+        let mul = 1e9
+        if (m[2] === 'million') mul=1e6
+        else if (m[2] === 'thousand') mul = 1000
+        const v = Number.parseFloat(m[1])*mul
+        const res = convert([v, m[3]])
+        if (res) {
+            return {
+                valueIn: v, unitIn: m[3],
+                valueOut: res[0], unitOut: res[1],
+                humanOut: toHumanReadable(res)
+            }
+        }
+    }
+
     // '6ft 1in' format?
     m = str.match(/(.+?)\s*(ft|foot|feet|')\s+(.+?)\s*(in|inch|")/)
     if (m && !Number.isNaN(Number.parseFloat(m[1])) && !Number.isNaN(Number.parseFloat(m[3]))) {
@@ -235,7 +282,7 @@ export function parseStr(str: string): Parsed {
     if (m && !Number.isNaN(Number.parseFloat(m[1]))) {
         const vin = Number.parseFloat(m[1])
         const v = convert([vin,m[2]])
-        console.log(v)
+        //console.log(v)
         if (v) {
             return {
                 valueIn: vin, unitIn: m[2],
