@@ -116,10 +116,8 @@ export function supportedUnits(filter?: string): string[] {
  * @returns {ValUnitPair | null} [SIUnit, converted value] or null
  * @throws
  */
-export function convert(input: ValUnitPair):ValUnitPair|null {
-    if (typeof input !== typeof [] || input.length!=2)
-        throw "Contract violation"
-    let [val, unit] = input
+export function convert([val, unit]: [number, string]):ValUnitPair|null {
+    
     if (typeof unit !== typeof '' || !Number.isFinite(val))
         throw "Wrong argument"
     else if (unit.length === 0)
@@ -153,12 +151,9 @@ export function convert(input: ValUnitPair):ValUnitPair|null {
  * @param arr Converted value in [value, SI-unit] format
  * @returns {string} Formatted value with unit at the end ( e.g. '1.2 cm')
  */
-export function toHumanReadable(arr: ValUnitPair): string {
-    if (typeof arr !== typeof [] || arr.length!=2)
-        throw "Contract violation"
+export function toHumanReadable([val, format]:[number, string]): string {
     
-    const [val,format] = arr
-    if (!Number.isFinite(val)) return ''
+    if (!Number.isFinite(val) || !format) return ''
 
     // format numbers for human consumption
     const numF = (val:number) => {

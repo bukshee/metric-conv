@@ -1,8 +1,8 @@
 {
   "devDependencies": {
     "@types/chrome": "^0.0.58",
-    "gulp": "^3.9.1",
-    "gulp-typescript": "^4.0.0-alpha.1",
-    "gulp-uglify": "^3.0.0"
+    "ts-loader": "^3.3.0",
+    "uglifyjs-webpack-plugin": "^1.1.6",
+    "webpack": "^3.10.0"
   }
 }

@@ -1,2 +1,2 @@
-extension/js/*.js
+extension/*.js
 node_modules
