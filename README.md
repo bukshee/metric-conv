@@ -4,10 +4,6 @@ A Chromium extension to convert US/UK units to their metric equivalents. Just to
 
 ![metric-conv](doc/metric.png)
 
-## License
-
-[GPLv2](https://en.wikipedia.org/wiki/GNU_General_Public_License#Version_2)
-
 ## Building it
 
 To skip this part go the *Releases* page, download the extension file and follow the instructions under the Installation section below.
